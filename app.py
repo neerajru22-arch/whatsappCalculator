@@ -155,55 +155,61 @@ def webhook():
     if request.method == 'POST':
         data = request.json
         try:
-            change_value = data["entry"][0]["changes"][0]["value"]
+            message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+            from_number = message["from"]
+            msg_type = message.get("type")
+            msg_id = message.get("id")
 
-            if "messages" in change_value:
-                message = change_value["messages"][0]
-                from_number = message["from"]
-                msg_type = message.get("type")
-                msg_id = message.get("id")
-
-                # Handle interactive replies
-                if msg_type == "interactive":
-                    interactive = message["interactive"]
-                    if interactive["type"] == "button_reply":
-                        button_id = interactive["button_reply"]["id"]
-                        if button_id == "order_food":
-                            send_food_list(from_number)
-                        elif button_id == "book_table":
-                            send_text(from_number, "How many guests? (Demo only)")
-                        elif button_id == "view_menu":
-                            send_media(from_number, "document")
-                        elif button_id == "contact_us":
-                            send_location(from_number)
-                            send_contact(from_number)
-                        elif button_id == "offers":
-                            send_media(from_number, "image")
-                    elif interactive["type"] == "list_reply":
-                        list_id = interactive["list_reply"]["id"]
-                        send_text(from_number, f"You selected {list_id}. (Demo order placed)")
-
-                # Handle text replies
-                elif msg_type == "text":
-                    raw_text = message.get("text", {}).get("body", "")
-                    cleaned = re.sub(r'[^a-z]', '', raw_text.strip().lower())
-
-                    if cleaned in ["hi", "hello", "hey", "menu", "start"]:
+            # Handle interactive replies
+            if msg_type == "interactive":
+                interactive = message["interactive"]
+                if interactive["type"] == "button_reply":
+                    button_id = interactive["button_reply"]["id"]
+                    if button_id == "order_food":
+                        send_food_list(from_number)
+                    elif button_id == "book_table":
+                        send_text(from_number, "How many guests? (Demo only)")
                         send_buttons(from_number)
-                    elif "thank" in cleaned:
-                        send_reaction(msg_id, "👍")
-                    elif "video" in cleaned:
-                        send_media(from_number, "video")
-                    elif "audio" in cleaned:
-                        send_media(from_number, "audio")
-                    elif "sticker" in cleaned:
-                        send_media(from_number, "sticker")
-                    elif "template" in cleaned:
-                        send_template(from_number)
-                    else:
-                        send_text(from_number, "I didn’t understand that 🤔. Type 'hi' to see the main menu again.")
-            else:
-                print("Webhook received non-message event:", data)
+                    elif button_id == "view_menu":
+                        send_media(from_number, "document")
+                        send_buttons(from_number)
+                    elif button_id == "contact_us":
+                        send_location(from_number)
+                        send_contact(from_number)
+                        send_buttons(from_number)
+                    elif button_id == "offers":
+                        send_media(from_number, "image")
+                        send_buttons(from_number)
+                elif interactive["type"] == "list_reply":
+                    list_id = interactive["list_reply"]["id"]
+                    send_text(from_number, f"You selected {list_id}. (Demo order placed)")
+                    send_buttons(from_number)
+
+            # Handle text replies
+            elif msg_type == "text":
+                raw_text = message.get("text", {}).get("body", "")
+                cleaned = re.sub(r'[^a-z]', '', raw_text.strip().lower())
+
+                if any(word in cleaned for word in ["hi", "hello", "hey", "ok", "menu", "start"]):
+                    send_buttons(from_number)
+                elif "thank" in cleaned:
+                    send_reaction(msg_id, "👍")
+                    send_buttons(from_number)
+                elif "video" in cleaned:
+                    send_media(from_number, "video")
+                    send_buttons(from_number)
+                elif "audio" in cleaned:
+                    send_media(from_number, "audio")
+                    send_buttons(from_number)
+                elif "sticker" in cleaned:
+                    send_media(from_number, "sticker")
+                    send_buttons(from_number)
+                elif "template" in cleaned:
+                    send_template(from_number)
+                    send_buttons(from_number)
+                else:
+                    send_text(from_number, "I didn’t understand that 🤔. Here’s the menu again:")
+                    send_buttons(from_number)
 
         except Exception as e:
             print("Error:", e)
