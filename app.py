@@ -2,12 +2,21 @@ from flask import Flask, request
 import requests
 import os
 import re
+import google.generativeai as genai
 
 app = Flask(__name__)
 
 ACCESS_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_ID")
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "my_verify_token")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Configure Gemini
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_model = genai.GenerativeModel("gemini-pro")
+else:
+    gemini_model = None
 
 # ---------------------- Helper Functions ----------------------
 def send_text(to, text):
@@ -19,7 +28,6 @@ def send_text(to, text):
 def send_buttons(to):
     url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
-    # WhatsApp supports max 3 buttons
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -155,16 +163,12 @@ def send_reaction(to_msg_id, emoji="👍"):
     }
     requests.post(url, headers=headers, json=payload)
 
-def send_template(to):
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "template",
-        "template": {"name": "hello_world", "language": {"code": "en_US"}},
-    }
-    requests.post(url, headers=headers, json=payload)
+# ---------------------- Gemini Integration ----------------------
+def ask_gemini(query):
+    if not gemini_model:
+        return "Sorry, Gemini API is not configured."
+    response = gemini_model.generate_content(query)
+    return response.text
 
 # ---------------------- Webhook ----------------------
 @app.route('/webhook', methods=['GET', 'POST'])
@@ -218,16 +222,9 @@ def webhook():
                     send_buttons(from_number)
                 elif "thank" in cleaned:
                     send_reaction(msg_id, "👍")
-                elif "video" in cleaned:
-                    send_media(from_number, "video")
-                elif "audio" in cleaned:
-                    send_media(from_number, "audio")
-                elif "sticker" in cleaned:
-                    send_media(from_number, "sticker")
-                elif "template" in cleaned:
-                    send_template(from_number)
                 else:
-                    send_text(from_number, "I didn’t understand that 🤔. Type 'hi' to see the main menu again.")
+                    reply = ask_gemini(raw_text)
+                    send_text(from_number, reply)
 
         except Exception as e:
             print("Error:", e)
