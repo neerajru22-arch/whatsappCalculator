@@ -11,12 +11,27 @@ PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_ID")
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "my_verify_token")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Configure Gemini
+# Configure Gemini with updated model name
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-pro")
+    gemini_model = genai.GenerativeModel("gemini-1.5-flash")  # updated model name
 else:
     gemini_model = None
+
+# ---------------------- Menu Context ----------------------
+MENU_CONTEXT = """
+You are Demo Restaurant’s assistant. Only answer based on this menu.
+
+Starters: Garlic Bread, Spring Rolls
+Mains: Pizza, Pasta, Burgers
+Desserts: Ice Cream, Brownie
+Drinks: Coke, Lemonade
+
+Rules:
+- If asked about items not on the menu, politely say they are unavailable and list available options.
+- Keep answers short and helpful, like a restaurant waiter.
+- Do not answer general knowledge or off-topic questions.
+"""
 
 # ---------------------- Helper Functions ----------------------
 def send_text(to, text):
@@ -167,7 +182,8 @@ def send_reaction(to_msg_id, emoji="👍"):
 def ask_gemini(query):
     if not gemini_model:
         return "Sorry, Gemini API is not configured."
-    response = gemini_model.generate_content(query)
+    prompt = f"{MENU_CONTEXT}\nCustomer: {query}\nAssistant:"
+    response = gemini_model.generate_content(prompt)
     return response.text
 
 # ---------------------- Webhook ----------------------
