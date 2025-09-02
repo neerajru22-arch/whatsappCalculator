@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, redirect
+from flask import Flask, request, render_template
 import requests
 import os
 import re
@@ -6,7 +6,6 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# ENV Vars
 ACCESS_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_ID")
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "my_verify_token")
@@ -22,7 +21,7 @@ if GEMINI_API_KEY:
 else:
     gemini_model = None
 
-# Menu context
+# ---------------------- Menu Context ----------------------
 MENU_CONTEXT = """
 You are Demo Restaurant’s assistant. Only answer based on this menu.
 
@@ -53,7 +52,7 @@ def save_message(user, text, sender="user"):
 def fetch_messages():
     if not SUPABASE_URL or not SUPABASE_KEY:
         return []
-    url = f"{SUPABASE_URL}/rest/v1/messages?order=created_at.desc&limit=50"
+    url = f"{SUPABASE_URL}/rest/v1/messages?order=created_at.desc"
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     res = requests.get(url, headers=headers)
     return res.json()
@@ -123,7 +122,7 @@ def reply():
     message = request.form["message"]
     send_text(user, message)
     save_message(user, message, "admin")
-    return redirect("/dashboard")
+    return "Message sent!"
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
