@@ -181,8 +181,9 @@ def webhook():
 
             # Handle text replies
             elif msg_type == "text":
-                text = message.get("text", {}).get("body", "").lower()
-                if "hi" in text or "menu" in text:
+                text = message.get("text", {}).get("body", "").strip().lower()
+
+                if text in ["hi", "hello", "menu", "start"]:
                     send_buttons(from_number)
                 elif "thank" in text:
                     send_reaction(msg_id, "👍")
@@ -195,7 +196,7 @@ def webhook():
                 elif "template" in text:
                     send_template(from_number)
                 else:
-                    send_text(from_number, "Type 'hi' to see the main menu again.")
+                    send_text(from_number, "I didn’t understand that 🤔. Type 'hi' to see the main menu again.")
 
         except Exception as e:
             print("Error:", e)
