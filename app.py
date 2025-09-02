@@ -82,21 +82,15 @@ def ask_gemini(query):
     return response.text
 
 # ---------------------- Webhook ----------------------
-@app.route('/webhook', methods=['GET', 'POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    if request.method == 'GET':
-        mode = request.args.get("hub.mode")
-        token = request.args.get("hub.verify_token")
-        challenge = request.args.get("hub.challenge")
-        if mode and token and token == VERIFY_TOKEN:
-            return challenge, 200
-        else:
-            return "Forbidden", 403
+    data = request.json
+    try:
+        changes = data["entry"][0]["changes"][0]["value"]
 
-    if request.method == 'POST':
-        data = request.json
-        try:
-            message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+        # Only process if 'messages' exists
+        if "messages" in changes:
+            message = changes["messages"][0]
             from_number = message["from"]
             msg_type = message.get("type")
 
@@ -104,6 +98,7 @@ def webhook():
                 raw_text = message.get("text", {}).get("body", "")
                 save_message(from_number, raw_text, "user")
 
+                # Simple intent handling
                 cleaned = re.sub(r'[^a-z]', '', raw_text.strip().lower())
                 if cleaned in ["hi", "hello", "hey", "menu", "start", "ok"]:
                     reply = "🍽️ Welcome! Type 'order' to see our menu."
@@ -115,9 +110,13 @@ def webhook():
                 send_text(from_number, reply)
                 save_message(from_number, reply, "bot")
 
-        except Exception as e:
-            print("Error:", e)
-        return "ok", 200
+        else:
+            print("Non-message event received:", changes)
+
+    except Exception as e:
+        print("Error in webhook:", e)
+
+    return "ok", 200
 
 # ---------------------- Dashboard ----------------------
 @app.route("/dashboard")
