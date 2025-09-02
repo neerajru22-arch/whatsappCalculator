@@ -19,6 +19,7 @@ def send_text(to, text):
 def send_buttons(to):
     url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
+    # WhatsApp supports max 3 buttons
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -30,12 +31,37 @@ def send_buttons(to):
                 "buttons": [
                     {"type": "reply", "reply": {"id": "order_food", "title": "Order Food"}},
                     {"type": "reply", "reply": {"id": "book_table", "title": "Table Booking"}},
-                    {"type": "reply", "reply": {"id": "view_menu", "title": "View Menu"}},
-                    {"type": "reply", "reply": {"id": "contact_us", "title": "Contact Us"}},
-                    {"type": "reply", "reply": {"id": "offers", "title": "Special Offers"}},
+                    {"type": "reply", "reply": {"id": "more_options", "title": "More Options"}}
                 ]
             },
         },
+    }
+    requests.post(url, headers=headers, json=payload)
+
+def send_more_options(to):
+    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
+    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "body": {"text": "Here are more options:"},
+            "action": {
+                "button": "Select",
+                "sections": [
+                    {
+                        "title": "More Options",
+                        "rows": [
+                            {"id": "view_menu", "title": "View Menu (PDF)", "description": "See our full menu"},
+                            {"id": "contact_us", "title": "Contact Us", "description": "Location & contact details"},
+                            {"id": "offers", "title": "Special Offers", "description": "See latest deals"},
+                        ]
+                    }
+                ]
+            }
+        }
     }
     requests.post(url, headers=headers, json=payload)
 
@@ -169,47 +195,39 @@ def webhook():
                         send_food_list(from_number)
                     elif button_id == "book_table":
                         send_text(from_number, "How many guests? (Demo only)")
-                        send_buttons(from_number)
-                    elif button_id == "view_menu":
-                        send_media(from_number, "document")
-                        send_buttons(from_number)
-                    elif button_id == "contact_us":
-                        send_location(from_number)
-                        send_contact(from_number)
-                        send_buttons(from_number)
-                    elif button_id == "offers":
-                        send_media(from_number, "image")
-                        send_buttons(from_number)
+                    elif button_id == "more_options":
+                        send_more_options(from_number)
                 elif interactive["type"] == "list_reply":
                     list_id = interactive["list_reply"]["id"]
-                    send_text(from_number, f"You selected {list_id}. (Demo order placed)")
-                    send_buttons(from_number)
+                    if list_id == "view_menu":
+                        send_media(from_number, "document")
+                    elif list_id == "contact_us":
+                        send_location(from_number)
+                        send_contact(from_number)
+                    elif list_id == "offers":
+                        send_media(from_number, "image")
+                    else:
+                        send_text(from_number, f"You selected {list_id}. (Demo order placed)")
 
             # Handle text replies
             elif msg_type == "text":
                 raw_text = message.get("text", {}).get("body", "")
                 cleaned = re.sub(r'[^a-z]', '', raw_text.strip().lower())
 
-                if any(word in cleaned for word in ["hi", "hello", "hey", "ok", "menu", "start"]):
+                if cleaned in ["hi", "hello", "hey", "menu", "start", "ok"]:
                     send_buttons(from_number)
                 elif "thank" in cleaned:
                     send_reaction(msg_id, "👍")
-                    send_buttons(from_number)
                 elif "video" in cleaned:
                     send_media(from_number, "video")
-                    send_buttons(from_number)
                 elif "audio" in cleaned:
                     send_media(from_number, "audio")
-                    send_buttons(from_number)
                 elif "sticker" in cleaned:
                     send_media(from_number, "sticker")
-                    send_buttons(from_number)
                 elif "template" in cleaned:
                     send_template(from_number)
-                    send_buttons(from_number)
                 else:
-                    send_text(from_number, "I didn’t understand that 🤔. Here’s the menu again:")
-                    send_buttons(from_number)
+                    send_text(from_number, "I didn’t understand that 🤔. Type 'hi' to see the main menu again.")
 
         except Exception as e:
             print("Error:", e)
