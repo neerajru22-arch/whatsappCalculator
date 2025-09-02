@@ -59,10 +59,19 @@ def fetch_messages():
 
 # ---------------------- WhatsApp Helpers ----------------------
 def send_text(to, text):
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
-    payload = {"messaging_product": "whatsapp", "to": to, "text": {"body": text}}
-    requests.post(url, headers=headers, json=payload)
+    url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"  # use v20.0
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "text": {"body": text}
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    print("WhatsApp API Response:", response.status_code, response.text)
+    return response.json()
 
 # ---------------------- Gemini ----------------------
 def ask_gemini(query):
