@@ -1,6 +1,7 @@
 from flask import Flask, request
 import requests
 import os
+import re
 
 app = Flask(__name__)
 
@@ -181,19 +182,20 @@ def webhook():
 
             # Handle text replies
             elif msg_type == "text":
-                text = message.get("text", {}).get("body", "").strip().lower()
+                raw_text = message.get("text", {}).get("body", "")
+                cleaned = re.sub(r'[^a-z]', '', raw_text.strip().lower())
 
-                if text in ["hi", "hello", "menu", "start"]:
+                if cleaned in ["hi", "hello", "hey", "menu", "start"]:
                     send_buttons(from_number)
-                elif "thank" in text:
+                elif "thank" in cleaned:
                     send_reaction(msg_id, "👍")
-                elif "video" in text:
+                elif "video" in cleaned:
                     send_media(from_number, "video")
-                elif "audio" in text:
+                elif "audio" in cleaned:
                     send_media(from_number, "audio")
-                elif "sticker" in text:
+                elif "sticker" in cleaned:
                     send_media(from_number, "sticker")
-                elif "template" in text:
+                elif "template" in cleaned:
                     send_template(from_number)
                 else:
                     send_text(from_number, "I didn’t understand that 🤔. Type 'hi' to see the main menu again.")
