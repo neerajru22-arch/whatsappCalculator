@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Restaurant - Real-time Dashboard</title>
+  <style>
+    body{font-family: Arial, sans-serif; background:#ece5dd; margin:0}
+    .app{max-width:1100px;margin:20px auto;background:#fff;display:flex;height:88vh;border-radius:8px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+    .sidebar{width:320px;border-right:1px solid #ddd;background:#f7f7f7;padding:10px;overflow:auto}
+    .side-header{padding:10px;font-weight:bold;background:#075E54;color:#fff}
+    .user-row{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+    .user-row:hover{background:#f0f0f0}
+    .chat{flex:1;display:flex;flex-direction:column}
+    .chat-header{padding:12px;background:#075E54;color:#fff}
+    .messages{flex:1;overflow:auto;padding:20px;background:#ece5dd}
+    .bubble{display:inline-block;padding:10px 14px;border-radius:14px;margin:6px 0;max-width:70%}
+    .bubble.user{background:#dcf8c6;margin-left:auto;text-align:right}
+    .bubble.bot{background:#fff;margin-right:auto;text-align:left}
+    .bubble.admin{background:#ffebcc;margin-left:auto;text-align:right;border:1px solid #e0c68a}
+    .composer{padding:12px;border-top:1px solid #ddd;display:flex;gap:8px;background:#fff}
+    .composer input{flex:1;padding:10px;border-radius:6px;border:1px solid #ccc}
+    .composer button{background:#075E54;color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer}
+    .small{font-size:12px;color:#666}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar">
+      <div class="side-header">Customers</div>
+      <div id="users"></div>
+    </div>
+    <div class="chat">
+      <div class="chat-header">Conversation <span id="current-user" class="small"></span></div>
+      <div id="messages" class="messages"></div>
+      <div class="composer" id="composer" style="display:none">
+        <input id="reply-input" placeholder="Type a reply..." />
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase config passed from server
+    const SUPABASE_URL = "{{ supabase_url }}";
+    const SUPABASE_ANON_KEY = "{{ supabase_anon_key }}";
+    const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+    const usersEl = document.getElementById('users');
+    const messagesEl = document.getElementById('messages');
+    const currentUserEl = document.getElementById('current-user');
+    const composer = document.getElementById('composer');
+    const input = document.getElementById('reply-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    async function loadUsers(){
+      const r = await fetch('/api/users');
+      const data = await r.json();
+      const users = data.users || [];
+      usersEl.innerHTML = '';
+      users.forEach(u=>{
+        const d = document.createElement('div');
+        d.className = 'user-row';
+        d.textContent = u;
+        d.onclick = ()=>selectUser(u);
+        usersEl.appendChild(d);
+      });
+    }
+
+    function renderMessages(msgs){
+      messagesEl.innerHTML = '';
+      msgs.forEach(m=>{
+        const div = document.createElement('div');
+        div.className = 'bubble ' + (m.sender || 'bot');
+        div.textContent = m.text;
+        messagesEl.appendChild(div);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function selectUser(u){
+      currentUser = u;
+      currentUserEl.textContent = u;
+      composer.style.display = 'flex';
+      // fetch messages from server
+      const r = await fetch('/api/messages?user=' + encodeURIComponent(u));
+      const data = await r.json();
+      renderMessages(data.messages || []);
+      // unsubscribe previous and subscribe to realtime inserts for this user
+      if(window._subscription) window._subscription.unsubscribe();
+      window._subscription = supabase.channel('messages:'+u)
+        .on('postgres_changes', {event:'INSERT', schema:'public', table:'messages', filter:`user_number=eq.${u}`}, payload => {
+          // append new message
+          const m = payload.new;
+          const div = document.createElement('div');
+          div.className = 'bubble ' + (m.sender || 'bot');
+          div.textContent = m.text;
+          messagesEl.appendChild(div);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        })
+        .subscribe();
+    }
+
+    sendBtn.onclick = async ()=>{
+      const text = input.value.trim();
+      if(!text || !currentUser) return;
+      // post to server /reply endpoint
+      await fetch('/reply', {method:'POST', body: new URLSearchParams({user: currentUser, message: text})});
+      input.value = '';
+    };
+
+    // init
+    loadUsers();
+
+    // keep users list refreshed every 8s
+    setInterval(loadUsers, 8000);
+  </script>
+</body>
+</html>
